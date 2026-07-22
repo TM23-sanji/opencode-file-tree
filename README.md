@@ -2,6 +2,8 @@
 
 A TUI sidebar plugin for [opencode](https://opencode.ai/) that adds a navigable file tree in the sidebar. Browse directories, click files to preview their content inline, and refresh the tree manually.
 
+![File tree screenshot](ss.png)
+
 ## Features
 
 - **File tree** — directories first, sorted alphabetically, with `▶`/`▼` expand/collapse
