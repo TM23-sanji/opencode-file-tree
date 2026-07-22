@@ -1,3 +1,5 @@
+import solidPlugin from '@opentui/solid/bun-plugin'
+
 const result = await Bun.build({
   entrypoints: ['./src/index.tsx'],
   outdir: './dist',
@@ -12,6 +14,7 @@ const result = await Bun.build({
     '@opentui/core',
     '@opentui/keymap',
   ],
+  plugins: [solidPlugin],
 })
 
 if (!result.success) {
@@ -24,3 +27,4 @@ console.log('Build succeeded. Output:')
 for (const output of result.outputs) {
   console.log(`  ${output.path} (${(output.size / 1024).toFixed(1)} KB)`)
 }
+

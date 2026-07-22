@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>building an opencode tui plugin</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+      :root {
+        --bg: #000000;
+        --text: #fff;
+        --text-main: #ff6b6b;
+        --text-light: #c8c8c8;
+        --highlight-bg: #2a2a2a;
+        --highlight-border: #3a3a3a;
+        --code-text: #ffd93d;
+      }
+
+      @font-face {
+        font-family: "custom_mono";
+        src: url("https://fonts.gstatic.com/s/robotomono/v22/L0x5DF4xlVMF-BfR8bXMIjhGq3-cXbKDO1w.woff2") format("woff2");
+        font-weight: 300;
+        font-style: normal;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: "custom_mono", "SF Mono", "Consolas", "Menlo", monospace;
+        font-size: 16px;
+        line-height: 1.7;
+        font-weight: 300;
+        margin: 0;
+        padding: 3rem;
+      }
+
+      a {
+        color: var(--text);
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        transition: color 0.2s ease-in-out;
+      }
+
+      a:hover {
+        color: var(--text-main);
+      }
+
+      .container {
+        max-width: 750px;
+        margin: 0 auto;
+      }
+
+      header {
+        margin-bottom: 4rem;
+      }
+
+      header h1 {
+        font-weight: bold;
+        font-size: 1.5em;
+        color: #ff6b6b;
+        line-height: 1.4;
+      }
+
+      header .meta {
+        color: var(--text-light);
+        font-size: 0.9em;
+        margin-top: 0.5rem;
+      }
+
+      article {
+        margin-top: 2rem;
+      }
+
+      article section {
+        margin-bottom: 3rem;
+      }
+
+      article h2, article h3 {
+        font-weight: bold;
+        font-size: 1em;
+        color: #ff6b6b;
+        margin-bottom: 1.5rem;
+      }
+
+      article p {
+        color: var(--text-light);
+        margin-bottom: 1rem;
+      }
+
+      article pre {
+        background: var(--highlight-bg);
+        border: 1px solid var(--highlight-border);
+        border-radius: 4px;
+        padding: 1rem;
+        overflow-x: auto;
+        font-size: 0.85em;
+        line-height: 1.5;
+        color: var(--text-light);
+        margin-bottom: 1rem;
+      }
+
+      article code {
+        color: #ffd93d;
+      }
+
+      .katex {
+        color: var(--text-light);
+      }
+
+      .katex-display {
+        color: var(--text-light);
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0.5rem 0;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <h1>building an opencode tui plugin</h1>
+        <p class="meta">July 2026 &bull; 8 min read</p>
+      </header>
+
+      <article>
+        <section>
+          <h2>what is a tui plugin</h2>
+          <p>
+            <a href="https://opencode.ai">opencode</a> is an open-source AI coding agent that runs in the terminal, on the desktop, and inside your IDE. its terminal UI (TUI) is built on <a href="https://opentui.com">opentui</a> &mdash; a framework for building rich terminal interfaces with <strong>solidjs</strong>. the TUI has a slot system: named places in the layout where plugins can inject their own UI. one of those slots is <code>sidebar_content</code>, which renders content in the left sidebar during an active coding session.
+          </p>
+          <p>
+            this post walks through building a real TUI plugin from scratch: a file tree sidebar. you will see the project structure, the module shape, the critical gotcha with solidjs jsx compilation, and the config traps that nearly derailed the whole thing. by the end you will know exactly what it takes to ship an opencode TUI plugin.
+          </p>
+        </section>
+
+        <section>
+          <h2>project structure</h2>
+          <p>
+            a TUI plugin is an npm package with a <code>./tui</code> export. the loader resolves this export at runtime, imports the module, and calls the <code>tui()</code> factory function. here is the minimal file layout:
+          </p>
+          <pre>
+opencode-file-tree/
+  package.json
+  build.mjs
+  tsconfig.json
+  src/
+    index.tsx
+  dist/
+    index.js
+</pre>
+          <p>
+            the <code>package.json</code> is the most important piece. it must declare the <code>./tui</code> export and the <code>oc-plugin</code> field so opencode knows this package targets the TUI system:
+          </p>
+          <pre>
+{
+  "name": "opencode-file-tree",
+  "type": "module",
+  "exports": {
+    "./tui": {
+      "default": "./dist/index.js"
+    }
+  },
+  "oc-plugin": ["tui"],
+  "dependencies": {
+    "@opentui/solid": "^0.1.92",
+    "solid-js": "^1.9.10"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.3.5"
+  }
+}
+</pre>
+          <p>
+            notice the <code>dependencies</code>. <code>@opentui/solid</code> is the solidjs renderer for opentui &mdash; it provides all the JSX elements like <code>&lt;box&gt;</code>, <code>&lt;text&gt;</code>, <code>&lt;scrollbox&gt;</code>, and the control flow components <code>&lt;Show&gt;</code> and <code>&lt;For&gt;</code>. <code>solid-js</code> provides the reactive primitives: <code>createSignal</code>, <code>createMemo</code>, <code>createEffect</code>. <code>@opencode-ai/plugin</code> provides the TypeScript types (<code>TuiPlugin</code>, <code>TuiPluginApi</code>, <code>TuiPluginModule</code>).
+          </p>
+          <p>
+            the build script uses <code>bun build</code> with the opentui solid plugin. this is the line that caused the most trouble:
+          </p>
+          <pre>
+import solidPlugin from '@opentui/solid/bun-plugin'
+
+const result = await Bun.build({
+  entrypoints: ['./src/index.tsx'],
+  outdir: './dist',
+  target: 'bun',
+  format: 'esm',
+  external: [
+    'solid-js',
+    '@opentui/solid',
+    '@opentui/core',
+    '@opentui/keymap',
+  ],
+  plugins: [solidPlugin],
+})
+</pre>
+          <p>
+            the <code>external</code> array tells bun not to bundle these packages &mdash; they are resolved from the host's runtime instead. the <code>solidPlugin</code> from <code>@opentui/solid/bun-plugin</code> is what makes the JSX transform work correctly. we will see what happens when you forget it.
+          </p>
+        </section>
+
+        <section>
+          <h2>the plugin anatomy</h2>
+          <p>
+            the entry point exports an object with <code>id</code> and <code>tui</code>. the <code>id</code> is required for path-based plugins and optional for npm plugins (the package name is used as fallback). the <code>tui</code> function receives three arguments: the <code>api</code>, plugin <code>options</code>, and <code>meta</code> metadata.
+          </p>
+          <pre>
+/** @jsxImportSource @opentui/solid */
+import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
+import { createMemo, createSignal, For, Show } from 'solid-js'
+import { readdir, readFile } from 'node:fs/promises'
+import { join, relative } from 'node:path'
+
+const tui: TuiPlugin = async (api) => {
+  const rootPath = api.state.path.worktree
+    || api.state.path.directory
+    || process.cwd()
+
+  const [dirCache, setDirCache] = createSignal({})
+  const [expanded, setExpanded] = createSignal(new Set())
+  const [loadError, setLoadError] = createSignal()
+
+  async function loadDir(dirPath) {
+    const entries = await readDir(dirPath)
+    setDirCache((prev) => ({ ...prev, [dirPath]: entries }))
+  }
+
+  loadDir(rootPath).catch((e) => setLoadError(e.message))
+
+  const flatTree = createMemo(() => {
+    /* walk cached directories, flatten with depth */
+  })
+
+  api.slots.register({
+    slots: {
+      sidebar_content() {
+        return (
+          &lt;box gap={0}&gt;
+            &lt;Show when={!loadError()} fallback={/* error */}&gt;
+              &lt;Show when={flatTree().length &gt; 0} fallback={/* loading */}&gt;
+                &lt;For each={flatTree()}&gt;
+                  {(item) => /* file row */ }
+                &lt;/For&gt;
+              &lt;/Show&gt;
+            &lt;/Show&gt;
+          &lt;/box&gt;
+        )
+      },
+    },
+  })
+}
+
+export default { id: 'file-tree-sidebar', tui }
+</pre>
+          <p>
+            the <code>/** @jsxImportSource @opentui/solid */</code> pragma tells bun to use opentui's JSX runtime. the <code>sidebar_content</code> function is a solidjs component. it reads signals created in the outer <code>tui()</code> scope and returns JSX using opentui elements. the slot system calls this function during rendering, passing <code>{ session_id }</code> as props.
+          </p>
+        </section>
+
+        <section>
+          <h2>the jsx pitfall</h2>
+          <p>
+            this is the bug that took the longest to track down. the <code>@opentui/solid/bun-plugin</code> is not optional &mdash; it is required. without it, bun's default JSX transform compiles <code>&lt;Show&gt;</code> and <code>&lt;For&gt;</code> into <code>React.createElement(Show, ...)</code> calls. the opentui solidjs reconciler does not understand <code>React.createElement</code>. it expects <code>_$createComponent(Show, ...)</code> &mdash; the solidjs internal JSX runtime.
+          </p>
+          <p>
+            the symptom is silent: the plugin loads, the slot registers, but the sidebar renders nothing. no error message, no crash. the reconciler encounters <code>React.createElement(Show, ...)</code> and throws an <code>Unknown component type</code> error that is caught and swallowed by the slot system's error boundary. the sidebar stays empty.
+          </p>
+          <p>
+            here is the difference in compiled output:
+          </p>
+          <pre>
+// without solidPlugin &mdash; broken
+import { createElement as _$createElement } from "react";
+_$createElement(Show, { when: loading, fallback: ... })
+
+// with solidPlugin &mdash; correct
+import { createComponent as _$createComponent } from "@opentui/solid";
+_$createComponent(Show, { get when() { return !loadError() } })
+</pre>
+          <p>
+            notice two things: the import source changes from <code>react</code> to <code>@opentui/solid</code>, and the function changes from <code>createElement</code> to <code>createComponent</code>. the solid plugin also wraps prop accessors in getters (<code>get when()</code>) so that the reconciler can track reactive dependencies properly.
+          </p>
+          <p>
+            the fix is a single line in <code>build.mjs</code>:
+          </p>
+          <pre>
+import solidPlugin from '@opentui/solid/bun-plugin'
+
+// add to the Bun.build() call:
+plugins: [solidPlugin]
+</pre>
+          <p>
+            this is easy to miss because the build succeeds either way. the JSX outputs valid JavaScript in both cases. only at runtime, inside the solidjs reconciler, does the difference surface.
+          </p>
+        </section>
+
+        <section>
+          <h2>the config gotchas</h2>
+          <p>
+            once the JSX is correct, the plugin still needs to be loaded by the TUI host. this is where two config traps await.
+          </p>
+          <p>
+            <strong>trap one: wrong config file.</strong> opencode has two separate config systems. <code>opencode.json</code> is for server/runtime plugins (tools, hooks, MCP servers). <code>tui.json</code> is for TUI plugins (sidebar slots, routes, keybinds). putting <code>"opencode-file-tree"</code> in <code>opencode.json</code> registers it as a server plugin &mdash; the <code>./tui</code> export is never resolved, the <code>tui()</code> factory is never called, and the slot is never registered. the fix is trivial but easy to overlook:
+          </p>
+          <pre>
+// &mdash; wrong
+~/.config/opencode/opencode.json
+{ "plugin": ["opencode-file-tree"] }
+
+// &mdash; correct
+~/.config/opencode/tui.json
+{ "plugin": ["opencode-file-tree"] }
+</pre>
+          <p>
+            <strong>trap two: npm resolution.</strong> when the TUI host encounters a bare npm spec like <code>"opencode-file-tree"</code>, it calls <code>Npm.add("opencode-file-tree@latest")</code>. this installs the package from the npm registry. if you have a fixed build <code>node_modules</code> locally but have not published it, the host downloads the old published version and overwrites your local files. the fix during development is to use a file path:
+          </p>
+          <pre>
+// bypasses npm registry, loads local build
+{ "plugin": ["./node_modules/opencode-file-tree/dist/index.js"] }
+</pre>
+          <p>
+            once the fixed version is published to npm, switch back to the bare spec. the rest of this post covers the publish step.
+          </p>
+        </section>
+
+        <section>
+          <h2>publishing</h2>
+          <p>
+            publishing is straightforward. bump the version in <code>package.json</code>, then run:
+          </p>
+          <pre>
+npm publish --legacy-peer-deps
+</pre>
+          <p>
+            the <code>--legacy-peer-deps</code> flag avoids peer dependency conflicts with opentui's <code>solid-js@1.9.12</code> requirement. after publishing, update <code>tui.json</code> back to the bare npm spec so the TUI host resolves the latest version from the registry.
+          </p>
+          <p>
+            you can also add <code>engines.opencode</code> to declare compatibility:
+          </p>
+          <pre>
+"engines": {
+  "opencode": "^1.0.0"
+}
+</pre>
+          <p>
+            if the range is not satisfied, opencode skips the plugin with a warning. this is optional but recommended for production plugins.
+          </p>
+        </section>
+
+        <section>
+          <h2>what we learned</h2>
+          <p>
+            building an opencode TUI plugin is straightforward once you know the pieces:<br />
+            <code>package.json</code> with <code>exports["./tui"]</code> and <code>"oc-plugin": ["tui"]</code><br />
+            <code>build.mjs</code> with <code>solidPlugin</code> from <code>@opentui/solid/bun-plugin</code><br />
+            entry point exporting <code>{ id, tui }</code><br />
+            slot registration via <code>api.slots.register()</code><br />
+            config in <code>tui.json</code>, not <code>opencode.json</code>
+          </p>
+          <p>
+            the silent JSX bug is the most dangerous &mdash; it builds, loads, and registers without error, then produces an invisible sidebar. always verify the compiled output contains <code>_$createComponent</code> calls from <code>@opentui/solid</code>, not <code>createElement</code> from <code>react</code>.
+          </p>
+          <p>
+            Till then, keep experimenting :)
+          </p>
+        </section>
+
+        <section>
+          <h2>links</h2>
+          <p>
+            <a href="https://github.com/TM23-sanji/opencode-file-tree">opencode-file-tree &mdash; the plugin built in this post</a><br />
+            <a href="https://opencode.ai">opencode &mdash; the open source AI coding agent</a><br />
+            <a href="https://opentui.com">opentui &mdash; terminal UI framework for solidjs</a><br />
+            <a href="https://opencode.ai/docs/tui">opencode TUI documentation</a><br />
+            <a href="https://github.com/anomalyco/opencode">opencode source code on GitHub</a>
+          </p>
+        </section>
+      </article>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+          ],
+        });
+      });
+    </script>
+  </body>
+</html>
