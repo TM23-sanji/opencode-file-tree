@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "types": ["bun"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true
+  },
+  "include": ["src/**/*", "build.mjs"]
+}

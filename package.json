@@ -1,0 +1,45 @@
+{
+  "name": "opencode-file-tree",
+  "version": "0.1.0",
+  "description": "TUI sidebar plugin for opencode that shows a file tree with directory browsing and inline file preview.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun run build.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@opentui/solid": "^0.1.92",
+    "solid-js": "^1.9.10"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.3.5",
+    "@opencode-ai/sdk": "^1.3.5",
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tm23/opencode-file-tree.git"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "sidebar",
+    "file-tree",
+    "file-explorer"
+  ]
+}
