@@ -11,15 +11,20 @@ A TUI sidebar plugin for [opencode](https://opencode.ai/) that adds a navigable 
 - **Smart ignore** — skips `node_modules`, `.git`, binaries, media, and build artifacts
 - **Refresh** — ↻ button reloads the tree from disk
 
-## Installation
+## Install
 
-Install the package:
+Install the package in your opencode config directory:
 
 ```bash
-opencode plugin opencode-file-tree
+cd ~/.config/opencode
+npm install opencode-file-tree
+# or
+bun add opencode-file-tree
 ```
 
-Or add it manually to `~/.config/opencode/tui.json`:
+## Configure
+
+Add the plugin to `~/.config/opencode/tui.json` using a file path:
 
 ```json
 {
@@ -35,6 +40,16 @@ Or add it manually to `~/.config/opencode/tui.json`:
 3. The file tree appears on the left sidebar showing your project's files
 4. Click a file to preview it inline; click another file or the × button to close
 5. Click the ↻ button to refresh the tree
+
+## Known issue
+
+The npm package spec format (`"plugin": ["opencode-file-tree"]`) does not work in opencode v1.17.10 through v1.18.4 due to a regression in OpenTUI. See [opencode issue #33884](https://github.com/anomalyco/opencode/issues/33884) for details.
+
+The file path workaround above is the recommended approach until a fixed opencode version ships. When the bug is resolved, you can switch to:
+
+```json
+{ "plugin": ["opencode-file-tree"] }
+```
 
 ## How it works
 
