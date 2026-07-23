@@ -16,7 +16,12 @@ A TUI sidebar plugin for [opencode](https://opencode.ai/) that adds a navigable 
 Install the package in your opencode config directory:
 
 ```bash
+# Linux / macOS
 cd ~/.config/opencode
+
+# Windows
+cd %APPDATA%\opencode
+
 npm install opencode-file-tree
 # or
 bun add opencode-file-tree
